@@ -17,6 +17,7 @@
 package cfg
 
 import (
+	"net"
 	"time"
 
 	"github.com/spf13/pflag"
@@ -143,6 +144,8 @@ type GcsConnectionConfig struct {
 	BillingProject string `yaml:"billing-project"`
 
 	ClientProtocol Protocol `yaml:"client-protocol"`
+
+	ClientSocketAddress net.TCPAddr `yaml:"client-socket-address"`
 
 	CustomEndpoint string `yaml:"custom-endpoint"`
 

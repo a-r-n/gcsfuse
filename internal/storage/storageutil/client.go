@@ -17,6 +17,7 @@ package storageutil
 import (
 	"crypto/tls"
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"time"
@@ -33,14 +34,15 @@ type StorageClientConfig struct {
 	/** Common client parameters. */
 
 	// ClientProtocol decides the go-sdk client to create.
-	ClientProtocol    cfg.Protocol
-	UserAgent         string
-	CustomEndpoint    string
-	KeyFile           string
-	TokenUrl          string
-	ReuseTokenFromUrl bool
-	MaxRetrySleep     time.Duration
-	RetryMultiplier   float64
+	ClientProtocol      cfg.Protocol
+	UserAgent           string
+	CustomEndpoint      string
+	ClientSocketAddress net.TCPAddr
+	KeyFile             string
+	TokenUrl            string
+	ReuseTokenFromUrl   bool
+	MaxRetrySleep       time.Duration
+	RetryMultiplier     float64
 
 	/** HTTP client parameters. */
 	MaxConnsPerHost            int
@@ -71,6 +73,10 @@ func CreateHttpClient(storageClientConfig *StorageClientConfig) (httpClient *htt
 			TLSNextProto: make(
 				map[string]func(string, *tls.Conn) http.RoundTripper,
 			),
+			DialContext: (&net.Dialer{
+				LocalAddr: &storageClientConfig.ClientSocketAddress,
+				Timeout:   30 * time.Second,
+			}).DialContext,
 		}
 	} else {
 		// For http2, change in MaxConnsPerHost doesn't affect the performance.

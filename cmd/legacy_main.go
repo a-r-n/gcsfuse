@@ -120,6 +120,7 @@ func getConfigForUserAgent(mountConfig *cfg.Config) string {
 func createStorageHandle(newConfig *cfg.Config, userAgent string) (storageHandle storage.StorageHandle, err error) {
 	storageClientConfig := storageutil.StorageClientConfig{
 		ClientProtocol:             newConfig.GcsConnection.ClientProtocol,
+		ClientSocketAddress:        newConfig.GcsConnection.ClientSocketAddress,
 		MaxConnsPerHost:            int(newConfig.GcsConnection.MaxConnsPerHost),
 		MaxIdleConnsPerHost:        int(newConfig.GcsConnection.MaxIdleConnsPerHost),
 		HttpClientTimeout:          newConfig.GcsConnection.HttpClientTimeout,
