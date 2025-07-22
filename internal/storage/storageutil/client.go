@@ -26,6 +26,7 @@ import (
 	"github.com/googlecloudplatform/gcsfuse/v3/internal/auth"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
+	"github.com/googlecloudplatform/gcsfuse/v3/internal/logger"
 )
 
 const urlSchemeSeparator = "://"
@@ -34,15 +35,15 @@ type StorageClientConfig struct {
 	/** Common client parameters. */
 
 	// ClientProtocol decides the go-sdk client to create.
-	ClientProtocol      cfg.Protocol
-	UserAgent           string
-	CustomEndpoint      string
-	ClientSocketAddress net.TCPAddr
-	KeyFile             string
-	TokenUrl            string
-	ReuseTokenFromUrl   bool
-	MaxRetrySleep       time.Duration
-	RetryMultiplier     float64
+	ClientProtocol        cfg.Protocol
+	UserAgent             string
+	CustomEndpoint        string
+	ClientSocketAddresses []net.TCPAddr
+	KeyFile               string
+	TokenUrl              string
+	ReuseTokenFromUrl     bool
+	MaxRetrySleep         time.Duration
+	RetryMultiplier       float64
 
 	/** HTTP client parameters. */
 	MaxConnsPerHost            int
@@ -61,6 +62,44 @@ type StorageClientConfig struct {
 	ReadStallRetryConfig cfg.ReadStallGcsRetriesConfig
 }
 
+var rrIdx int = 0
+
+type MultinicDialer struct {
+	innerDialer         net.Dialer
+	storageClientConfig *StorageClientConfig
+}
+
+func (multinicDialer MultinicDialer) GetRoundRobinClientSocketAddress(storageClientConfig *StorageClientConfig) (result *net.TCPAddr, err error) {
+	// It's such a shame I have no idea how mod works in go!
+	if len(storageClientConfig.ClientSocketAddresses) != 2 {
+		err = fmt.Errorf("how is this working")
+		return
+	}
+	result = &storageClientConfig.ClientSocketAddresses[rrIdx]
+	switch rrIdx {
+	case 0:
+		rrIdx = 1
+	default:
+		rrIdx = 0
+	}
+	return
+}
+
+func (multinicDialer MultinicDialer) MultinicDialContext(ctx context.Context, network, address string) (conn net.Conn, err error) {
+	// For better or worse, make new dialer every time?
+	localAddr, err := multinicDialer.GetRoundRobinClientSocketAddress(multinicDialer.storageClientConfig)
+	if err != nil {
+		return
+	}
+
+	logger.Infof("ARNTODO call to DialContext: using %s", localAddr)
+
+	return (&net.Dialer{
+		LocalAddr: localAddr,
+		Timeout:   30 * time.Second,
+	}).DialContext(ctx, network, address)
+}
+
 func CreateHttpClient(storageClientConfig *StorageClientConfig) (httpClient *http.Client, err error) {
 	var transport *http.Transport
 	// Using http1 makes the client more performant.
@@ -73,11 +112,11 @@ func CreateHttpClient(storageClientConfig *StorageClientConfig) (httpClient *htt
 			TLSNextProto: make(
 				map[string]func(string, *tls.Conn) http.RoundTripper,
 			),
-			DialContext: (&net.Dialer{
-				LocalAddr: &storageClientConfig.ClientSocketAddress,
-				Timeout:   30 * time.Second,
-			}).DialContext,
+			DialContext: (&MultinicDialer{
+				storageClientConfig: storageClientConfig,
+			}).MultinicDialContext,
 		}
+		logger.Info("Survived?")
 	} else {
 		// For http2, change in MaxConnsPerHost doesn't affect the performance.
 		transport = &http.Transport{

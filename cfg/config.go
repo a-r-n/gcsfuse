@@ -145,7 +145,7 @@ type GcsConnectionConfig struct {
 
 	ClientProtocol Protocol `yaml:"client-protocol"`
 
-	ClientSocketAddress net.TCPAddr `yaml:"client-socket-address"`
+	ClientSocketAddresses []net.TCPAddr `yaml:"client-socket-addresses"`
 
 	CustomEndpoint string `yaml:"custom-endpoint"`
 
